@@ -1,0 +1,24 @@
+# Konfigurasi rahasia — jangan pernah diupload
+backend/.env
+
+# Virtual environment Python
+backend/venv/
+
+# File upload dari user (foto bukti bayar)
+backend/uploads/
+
+# Database lokal sementara (sebelum pakai Supabase)
+backend/reservations_db.json
+
+# File cache Python
+__pycache__/
+*.pyc
+*.pyo
+
+# File sistem
+.DS_Store
+Thumbs.db
+
+# Panduan sistem nya ada token nya jir
+
+PANDUAN_LENGKAP.md

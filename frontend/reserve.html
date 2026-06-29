@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="reserve.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reserve — A Piece of Eden</title>
+  <link href="https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@400;700&family=Allura&family=Alegreya:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+
+  <style>
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .toast {
+      position: fixed;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: #1c8049;
+      color: #fff;
+      padding: 14px 28px;
+      border-radius: 30px;
+      font-family: 'Alegreya', serif;
+      font-size: 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+      opacity: 0;
+      transition: opacity 0.4s, transform 0.4s;
+      z-index: 99999;
+      text-align: center;
+      max-width: 480px;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.error { background: #c0392b; }
+
+    .receipt-placeholder {
+      font-family: 'Alegreya', serif;
+      font-size: 13px;
+      color: #6BA284;
+      margin-top: 6px;
+      text-align: center;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="navbar-wrapper">
+  <div class="navbar">
+    <div class="logo">A Piece of Eden</div>
+    <div class="nav-links">
+      <a href="Index.html#home">Home</a>
+      <a href="Index.html#gardens">Gardens</a>
+      <a href="Index.html#reserve" class="active">Reserve</a>
+      <a href="Index.html#contact">Contact</a>
+    </div>
+  </div>
+</div>
+
+<section class="reserve-hero">
+  <h1 class="reserve-title">Reserve Your Paradise</h1>
+  <p class="reserve-subtitle">Let us create your perfect moment</p>
+</section>
+
+<section class="reserve-form-section">
+  <div class="reserve-card">
+
+    <div class="reserve-divider">
+      <span></span>
+      <div class="reserve-dot"></div>
+      <span></span>
+    </div>
+
+    <form class="reserve-form" id="reserve-form">
+
+      <div class="form-group full">
+        <label>Your Name</label>
+        <input type="text" id="input-name" placeholder="Enter your full name" required>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="input-email" placeholder="your@email.com" required>
+        </div>
+        <div class="form-group">
+          <label>Phone</label>
+          <input type="tel" id="input-phone" placeholder="+62 812 3456 7890" required>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Event Date</label>
+          <input type="date" id="input-date" required>
+        </div>
+        <div class="form-group">
+          <label>Time Range</label>
+          <div class="time-range-wrapper">
+            <input type="time" id="time-start">
+            <span class="time-separator">—</span>
+            <input type="time" id="time-end">
+          </div>
+        </div>
+      </div>
+
+      <div class="total-cost-wrapper" id="total-cost-wrapper" style="display:none;">
+        <div class="total-cost-label">Total Payment</div>
+        <div class="total-cost-amount" id="total-cost-amount">Rp 0</div>
+        <div class="total-cost-detail" id="total-cost-detail"></div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Estimated Guests</label>
+          <input type="number" id="input-guests" placeholder="e.g. 150" min="1" max="250" required>
+        </div>
+        <div class="form-group">
+          <div class="form-group">
+            <label>Event Description</label>
+            <textarea id="input-description" placeholder="Tell us about your dream event..." style="height: 60px;" required></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="upload-center">
+        <button type="button" class="upload-btn" style="width: fit-content;" onclick="document.getElementById('payment-file').click()">
+          <svg viewBox="0 0 24 24" fill="none" width="14" height="14"
+               stroke="currentColor" stroke-width="1.5"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          Upload Payment
+        </button>
+        <input type="file" id="payment-file" accept="image/*,.pdf" style="display:none" />
+        <!-- Elemen ini dibutuhkan JavaScript untuk preview nama file -->
+        <img id="preview-image" style="display:none; max-width:200px; margin-top:8px; border-radius:8px;" alt="Preview bukti bayar" />
+        <div class="receipt-placeholder" id="receipt-placeholder" style="display:none;"></div>
+      </div>
+
+      <div class="form-submit" style="display: flex; justify-content: center;">
+        <button type="button" class="reserve-submit-btn">Reserve Now</button>
+      </div>
+
+    </form>
+
+    <!-- TERMS AND RULES -->
+    <div class="terms-overlay" id="terms-overlay">
+      <div class="terms-modal">
+        <div class="terms-header">
+          <h2 class="terms-title">Terms & Reservation Requirements</h2>
+          <p class="terms-subtitle">A Piece of Eden</p>
+          <div class="reserve-divider" style="margin: 20px 0 0;">
+            <span></span>
+            <div class="reserve-dot"></div>
+            <span></span>
+          </div>
+        </div>
+
+        <div class="terms-body" id="terms-body">
+          <h3>1. General Terms</h3>
+          <p>By making a reservation, the client is deemed to have read, understood, and agreed to all applicable terms and conditions at A Piece of Eden.</p>
+          <p>A Piece of Eden reserves the right to reject or cancel any reservation if a violation of the applicable terms and conditions is found.</p>
+          <p>All activities conducted during the event are the sole responsibility of the client.</p>
+          <p>The client is required to maintain order, security, and environmental comfort throughout the event.</p>
+          <p>A Piece of Eden reserves the right to modify these terms and conditions at any time without prior notice.</p>
+
+          <h3>2. Garden & Venue Usage Information</h3>
+          <p>The venue provided consists of a garden area without additional decorations unless otherwise agreed upon.</p>
+          <p>Clients are prohibited from damaging facilities, plants, properties, or any surrounding areas of the venue.</p>
+          <p>Writing on, nailing, attaching objects to, or altering any part of the facilities without permission from A Piece of Eden is strictly prohibited.</p>
+          <p>Clients are responsible for maintaining cleanliness before, during, and after the event.</p>
+          <p>All waste must be disposed of in the designated trash bins provided.</p>
+          <p>Bringing hazardous, flammable, or illegal items into the venue area is strictly prohibited.</p>
+          <p>The venue may not be used for activities that violate laws, public order, or social norms.</p>
+          <p>The maximum guest capacity permitted is 250 guests.</p>
+          <p>A Piece of Eden is not responsible for the loss of personal belongings belonging to clients or guests.</p>
+          <p>Any damage caused by the negligence of the client or guests will be subject to compensation fees according to the level of damage.</p>
+          <p>Clients are required to comply with the venue's operational hours.</p>
+          <p>Extending the duration of venue usage after the reservation has been confirmed is prohibited unless approved by the administration.</p>
+          <p>The use of sound systems or activities that may disturb the surrounding environment may be restricted according to management policies.</p>
+          <p>A Piece of Eden reserves the right to terminate the event if serious violations of venue regulations occur.</p>
+
+          <h3>3. Reservation & Payment Information</h3>
+          <p>The minimum reservation duration is 2 hours.</p>
+          <p>Reservations must be made at least 10 days prior to the event date.</p>
+          <p>Clients are required to pay a minimum deposit (DP) of 30% of the total reservation fee.</p>
+          <p>Full payment must be completed no later than the event day.</p>
+          <p>A reservation is considered valid only after the deposit payment has been successfully verified by the administration.</p>
+          <p>If the client cancels the reservation, only 20% of the total deposit amount will be refunded.</p>
+          <p>Late full payment may result in unilateral cancellation of the reservation by A Piece of Eden.</p>
+          <p>Agreed pricing may change if the client modifies reservation details.</p>
+          <p>Clients are required to retain proof of payment until the event has concluded.</p>
+          <p>All bank transfer fees or administrative charges are the responsibility of the client.</p>
+          <p>Clients are not permitted to reschedule reservations without prior approval from the administration.</p>
+
+          <h3>4. Client Information</h3>
+          <p>Clients are required to provide accurate and complete personal information.</p>
+          <p>The phone number and email address provided must be active and reachable.</p>
+          <p>Errors in data submission made by the client are not the responsibility of A Piece of Eden.</p>
+          <p>Reservation-related information will be sent through the registered email address or phone number.</p>
+          <p>Clients are fully responsible for maintaining the security of their accounts within the reservation system.</p>
+          <p>A Piece of Eden reserves the right to contact clients regarding reservations, payments, or schedule changes.</p>
+          <p>Client personal data will be kept confidential and used solely for reservation purposes.</p>
+
+          <h3>5. Force Majeure</h3>
+          <p>A Piece of Eden shall not be held responsible for cancellations or event disruptions caused by natural disasters, extreme weather conditions, fires, riots, power outages, system failures, or other circumstances beyond management control.</p>
+          <p>Under certain circumstances, event schedules may be rescheduled based on mutual agreement between both parties.</p>
+
+          <h3>6. Client Agreement</h3>
+          <p>By proceeding with a reservation, the client acknowledges that they have read and agreed to all applicable terms and conditions and are willing to accept any consequences resulting from violations of the established regulations.</p>
+        </div>
+
+        <div class="terms-footer">
+          <div class="terms-scroll-hint" id="terms-scroll-hint">Scroll down to read all terms and conditions ↓</div>
+          <button class="terms-agree-btn" id="terms-agree-btn" disabled>I Agree & Submit</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<div class="reserve-back">
+  <button onclick="window.location.href='Index.html'" class="reserve-back-btn">Go Back</button>
+</div>
+
+<!-- Toast notifikasi -->
+<div class="toast" id="toast"></div>
+
+<script>
+  // ─────────────────────────────────────────────────────────────
+  //  GANTI URL INI sesuai alamat backend kamu
+  //  Development (laptop): "http://localhost:8000"
+  //  Setelah deploy ke server: ganti dengan URL server kamu
+  // ─────────────────────────────────────────────────────────────
+  const API_URL = "http://localhost:8000";
+
+  // ─── Kalkulasi biaya ───────────────────────
+  const timeStart = document.getElementById('time-start');
+  const timeEnd   = document.getElementById('time-end');
+  const totalWrapper = document.getElementById('total-cost-wrapper');
+  const totalAmount  = document.getElementById('total-cost-amount');
+  const totalDetail  = document.getElementById('total-cost-detail');
+
+  let currentTotalCost = 0;
+  let currentDpAmount  = 0;
+
+  function calculateCost() {
+    if (!timeStart.value || !timeEnd.value) {
+      totalWrapper.style.display = 'none';
+      currentTotalCost = 0; currentDpAmount = 0;
+      return;
+    }
+    const [startH, startM] = timeStart.value.split(':').map(Number);
+    const [endH,   endM]   = timeEnd.value.split(':').map(Number);
+    const diffMinutes = (endH * 60 + endM) - (startH * 60 + startM);
+
+    if (diffMinutes <= 0) {
+      totalWrapper.style.display = 'none';
+      currentTotalCost = 0; currentDpAmount = 0;
+      return;
+    }
+    const fullHours = Math.floor(diffMinutes / 60);
+    const remaining = diffMinutes % 60;
+    let cost = fullHours * 3000000;
+    if (remaining === 30) cost += 2000000;
+
+    const dp = Math.round(cost * 0.30);
+    currentTotalCost = cost;
+    currentDpAmount  = dp;
+
+    totalAmount.textContent = `Rp ${cost.toLocaleString('id-ID')}`;
+    totalDetail.innerHTML = `
+      <span style="font-size:22px; color:#589372;">DP 30% = Rp ${dp.toLocaleString('id-ID')}</span>
+      <div class="bank-info">
+        <div class="bank-row"><span class="bank-name">BCA</span><span>010208050622</span><span class="bank-an">a/n A Piece Of Eden</span></div>
+        <div class="bank-row"><span class="bank-name">BNI</span><span>020104080506</span><span class="bank-an">a/n A Piece Of Eden</span></div>
+        <div class="bank-row"><span class="bank-name">SeaBank</span><span>00124856</span><span class="bank-an">a/n A Piece Of Eden</span></div>
+      </div>`;
+    totalWrapper.style.display = 'block';
+  }
+
+  timeStart.addEventListener('change', calculateCost);
+  timeEnd.addEventListener('change', calculateCost);
+
+  // ─── Preview file upload ───────────────────
+  const proof        = document.getElementById('payment-file');
+  const previewImage = document.getElementById('preview-image');
+  const placeholder  = document.getElementById('receipt-placeholder');
+
+  proof.addEventListener('change', function () {
+    const file = this.files[0];
+    if (!file) return;
+
+    // Tampilkan nama file
+    placeholder.textContent = '✓ ' + file.name;
+    placeholder.style.display = 'block';
+
+    // Kalau gambar, tampilkan preview kecil
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        previewImage.src = e.target.result;
+        previewImage.style.display = 'block';
+      };
+      reader.readAsDataURL(file);
+    } else {
+      previewImage.style.display = 'none';
+    }
+  });
+
+  // ─── Tombol Reserve Now → validasi → buka modal ───
+  document.querySelector('.reserve-submit-btn').addEventListener('click', function () {
+    if (!timeStart.value || !timeEnd.value || currentTotalCost === 0) {
+      showToast('Mohon isi jam mulai dan jam selesai acara.', true); return;
+    }
+    if (!proof.files || proof.files.length === 0) {
+      showToast('Mohon upload bukti pembayaran DP terlebih dahulu.', true); return;
+    }
+    const form = document.getElementById('reserve-form');
+    if (!form.checkValidity()) {
+      form.reportValidity(); return;
+    }
+    document.getElementById('terms-overlay').classList.add('active');
+    document.body.style.overflow = 'hidden';
+  });
+
+  // ─── Aktifkan tombol Agree setelah scroll ───
+  const termsBody      = document.getElementById('terms-body');
+  const termsAgreeBtn  = document.getElementById('terms-agree-btn');
+  const termsScrollHint = document.getElementById('terms-scroll-hint');
+
+  termsBody.addEventListener('scroll', function () {
+    const isBottom = termsBody.scrollTop + termsBody.clientHeight >= termsBody.scrollHeight - 20;
+    if (isBottom) {
+      termsAgreeBtn.removeAttribute('disabled');
+      termsScrollHint.classList.add('hidden');
+    }
+  });
+
+  // ─── Kirim data ke backend saat klik "I Agree & Submit" ───
+  termsAgreeBtn.addEventListener('click', async function () {
+    // Tampilkan loading
+    termsAgreeBtn.innerHTML = '<span class="spinner"></span>Mengirim...';
+    termsAgreeBtn.disabled = true;
+
+    try {
+      const formData = new FormData();
+      formData.append('name',              document.getElementById('input-name').value.trim());
+      formData.append('email',             document.getElementById('input-email').value.trim());
+      formData.append('phone',             document.getElementById('input-phone').value.trim());
+      formData.append('event_date',        document.getElementById('input-date').value);
+      formData.append('time_start',        timeStart.value);
+      formData.append('time_end',          timeEnd.value);
+      formData.append('guests',            document.getElementById('input-guests').value);
+      formData.append('event_description', document.getElementById('input-description').value.trim());
+      formData.append('total_cost',        currentTotalCost);
+      formData.append('dp_amount',         currentDpAmount);
+      formData.append('payment_proof',     proof.files[0]);
+
+      const response = await fetch(`${API_URL}/api/reservations`, {
+        method: 'POST',
+        body: formData
+      });
+
+      const result = await response.json();
+
+      document.getElementById('terms-overlay').classList.remove('active');
+      document.body.style.overflow = '';
+
+      if (response.ok && result.success) {
+        showToast('✓ Reservasi berhasil dikirim! Kami akan menghubungi Anda segera.');
+        setTimeout(() => {
+          document.getElementById('reserve-form').reset();
+          previewImage.style.display = 'none';
+          placeholder.style.display  = 'none';
+          totalWrapper.style.display  = 'none';
+          currentTotalCost = 0; currentDpAmount = 0;
+        }, 800);
+      } else {
+        showToast('Gagal: ' + (result.detail || result.message || 'Terjadi kesalahan.'), true);
+      }
+
+    } catch (err) {
+      document.getElementById('terms-overlay').classList.remove('active');
+      document.body.style.overflow = '';
+      console.error(err);
+      showToast('Tidak dapat terhubung ke server. Pastikan backend sudah berjalan.', true);
+    } finally {
+      termsAgreeBtn.innerHTML = 'I Agree & Submit';
+      termsAgreeBtn.disabled  = false;
+    }
+  });
+
+  // ─── Fungsi toast notifikasi ───
+  function showToast(msg, isError = false) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast' + (isError ? ' error' : '') + ' show';
+    setTimeout(() => { t.className = 'toast'; }, 4500);
+  }
+</script>
+
+</body>
+</html>
