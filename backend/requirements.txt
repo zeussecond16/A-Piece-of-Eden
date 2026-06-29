@@ -5,9 +5,9 @@ fastapi>=0.115.5
 uvicorn>=0.30.0
 python-multipart>=0.0.12
 pydantic>=2.11.0
-httpx
-python-dotenv
-supabase
+httpx>=0.28.1
+python-dotenv>=1.0.1
+supabase>=2.15.3
 
 # ── Untuk porting ke Supabase nanti ──────────
 # Hapus tanda # di bawah saat sudah siap porting:
