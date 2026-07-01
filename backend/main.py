@@ -16,7 +16,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 app = FastAPI(title="A Piece of Eden API", version="2.0.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://deploy-eden.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
