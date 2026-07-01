@@ -1,8 +1,3 @@
-"""
-A Piece of Eden — Backend (FastAPI + Supabase)
-Upload file pakai httpx langsung ke Supabase Storage REST API
-"""
-
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -12,9 +7,9 @@ from supabase import create_client, Client
 
 load_dotenv()
 
-SUPABASE_URL    = os.getenv("SUPABASE_URL", "").rstrip("/")
-SUPABASE_KEY    = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-STORAGE_BUCKET  = os.getenv("SUPABASE_STORAGE_BUCKET", "payment-proofs")
+SUPABASE_URL   = os.getenv("SUPABASE_URL", "").rstrip("/")
+SUPABASE_KEY   = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+STORAGE_BUCKET = os.getenv("SUPABASE_STORAGE_BUCKET", "payment-proofs")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -28,32 +23,20 @@ app.add_middleware(
 )
 
 
-# ── Upload file ke Supabase Storage ────────────────────────────────
 def upload_to_supabase_storage(file_bytes: bytes, file_name: str, content_type: str) -> str:
     upload_url = f"{SUPABASE_URL}/storage/v1/object/{STORAGE_BUCKET}/{file_name}"
-
-    # Cetak URL di terminal agar mudah debug kalau ada masalah
-    print(f"[DEBUG] SUPABASE_URL  = {SUPABASE_URL}")
-    print(f"[DEBUG] Upload ke URL = {upload_url}")
-
     headers = {
         "Authorization": f"Bearer {SUPABASE_KEY}",
         "apikey": SUPABASE_KEY,
         "Content-Type": content_type,
         "x-upsert": "true",
     }
-
     response = httpx.post(upload_url, content=file_bytes, headers=headers)
-
-    print(f"[DEBUG] Response status = {response.status_code}")
-    print(f"[DEBUG] Response body   = {response.text}")
-
     if response.status_code not in (200, 201):
         raise HTTPException(
             status_code=500,
             detail=f"Gagal upload file ke Supabase Storage: {response.text}"
         )
-
     return f"{SUPABASE_URL}/storage/v1/object/public/{STORAGE_BUCKET}/{file_name}"
 
 
@@ -61,7 +44,6 @@ class ReservationStatus(BaseModel):
     status: str
 
 
-# ── 1. SUBMIT RESERVASI ────────────────────────────────────────────
 @app.post("/api/reservations")
 async def create_reservation(
     name:              str        = Form(...),
@@ -112,14 +94,12 @@ async def create_reservation(
     }
 
 
-# ── 2. LIHAT SEMUA RESERVASI ───────────────────────────────────────
 @app.get("/api/reservations")
 def list_reservations():
     response = supabase.table("reservations").select("*").order("created_at", desc=True).execute()
     return {"success": True, "total": len(response.data), "data": response.data}
 
 
-# ── 3. LIHAT SATU RESERVASI ────────────────────────────────────────
 @app.get("/api/reservations/{reservation_id}")
 def get_reservation(reservation_id: str):
     response = supabase.table("reservations").select("*").eq("id", reservation_id).execute()
@@ -128,7 +108,6 @@ def get_reservation(reservation_id: str):
     return {"success": True, "data": response.data[0]}
 
 
-# ── 4. UPDATE STATUS ───────────────────────────────────────────────
 @app.patch("/api/reservations/{reservation_id}/status")
 def update_status(reservation_id: str, body: ReservationStatus):
     valid = ["pending", "confirmed", "cancelled"]
@@ -140,7 +119,6 @@ def update_status(reservation_id: str, body: ReservationStatus):
     return {"success": True, "message": f"Status diubah ke '{body.status}'", "data": response.data[0]}
 
 
-# ── 5. CEK KETERSEDIAAN TANGGAL ────────────────────────────────────
 @app.get("/api/availability")
 def check_availability(date: str):
     response = supabase.table("reservations") \
