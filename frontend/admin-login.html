@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="reserve.css">
+  <link rel="stylesheet" href="admin.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Login — A Piece of Eden</title>
+  <link href="https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@400;700&family=Allura&family=Alegreya:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+
+  <style>
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .toast {
+      position: fixed;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: #1c8049;
+      color: #fff;
+      padding: 14px 28px;
+      border-radius: 30px;
+      font-family: 'Alegreya', serif;
+      font-size: 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+      opacity: 0;
+      transition: opacity 0.4s, transform 0.4s;
+      z-index: 99999;
+      text-align: center;
+      max-width: 480px;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.error { background: #c0392b; }
+  </style>
+</head>
+
+<body>
+
+<div class="navbar-wrapper">
+  <div class="navbar">
+    <div class="logo">A Piece of Eden</div>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="index.html#gardens">Gardens</a>
+      <a href="reserve.html">Reserve</a>
+      <a href="index.html#contact">Contact</a>
+    </div>
+  </div>
+</div>
+
+<section class="auth-hero">
+  <h1 class="auth-title">Admin Portal</h1>
+  <p class="auth-subtitle">Kelola paradise dengan bijaksana</p>
+</section>
+
+<section class="auth-section">
+  <div class="auth-card">
+
+    <div class="reserve-divider" style="margin-bottom: 32px;">
+      <span></span>
+      <div class="reserve-dot"></div>
+      <span></span>
+    </div>
+
+    <div class="auth-error" id="auth-error"></div>
+
+    <form class="auth-form" id="login-form">
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="input-email" placeholder="admin@apieceofeden.com" required>
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="input-password" placeholder="••••••••" required>
+      </div>
+
+      <button type="submit" class="auth-submit-btn" id="login-btn">Login</button>
+    </form>
+
+    <p class="auth-switch">Belum punya akun admin? <a href="admin-register.html">Daftar di sini</a></p>
+  </div>
+</section>
+
+<div class="auth-back">
+  <button onclick="window.location.href='index.html'" class="reserve-back-btn">Go Back</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const API_URL = "https://grand-dedication-production-9d90.up.railway.app";
+
+  const form      = document.getElementById('login-form');
+  const loginBtn  = document.getElementById('login-btn');
+  const errorBox  = document.getElementById('auth-error');
+
+  // Kalau sudah login, langsung lempar ke dashboard
+  if (localStorage.getItem('eden_admin_token')) {
+    window.location.href = 'admin-dashboard.html';
+  }
+
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    errorBox.classList.remove('show');
+
+    const email    = document.getElementById('input-email').value.trim();
+    const password = document.getElementById('input-password').value;
+
+    loginBtn.innerHTML = '<span class="spinner"></span>Masuk...';
+    loginBtn.disabled = true;
+
+    try {
+      const response = await fetch(`${API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        localStorage.setItem('eden_admin_token', result.access_token);
+        localStorage.setItem('eden_admin_email', result.email);
+        showToast('✓ Login berhasil! Mengalihkan...');
+        setTimeout(() => { window.location.href = 'admin-dashboard.html'; }, 600);
+      } else {
+        showError(result.detail || 'Email atau password salah.');
+      }
+    } catch (err) {
+      console.error(err);
+      showError('Tidak dapat terhubung ke server. Pastikan backend sudah berjalan.');
+    } finally {
+      loginBtn.innerHTML = 'Login';
+      loginBtn.disabled = false;
+    }
+  });
+
+  function showError(msg) {
+    errorBox.textContent = msg;
+    errorBox.classList.add('show');
+  }
+
+  function showToast(msg, isError = false) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast' + (isError ? ' error' : '') + ' show';
+    setTimeout(() => { t.className = 'toast'; }, 4500);
+  }
+</script>
+
+</body>
+</html>

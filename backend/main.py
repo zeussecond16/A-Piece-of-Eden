@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os, uuid, httpx
@@ -7,13 +7,19 @@ from supabase import create_client, Client
 
 load_dotenv()
 
-SUPABASE_URL   = os.getenv("SUPABASE_URL", "").rstrip("/")
-SUPABASE_KEY   = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-STORAGE_BUCKET = os.getenv("SUPABASE_STORAGE_BUCKET", "payment-proofs")
+SUPABASE_URL         = os.getenv("SUPABASE_URL", "").rstrip("/")
+SUPABASE_KEY         = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+SUPABASE_ANON_KEY    = os.getenv("SUPABASE_ANON_KEY")
+STORAGE_BUCKET       = os.getenv("SUPABASE_STORAGE_BUCKET", "payment-proofs")
+ADMIN_REGISTER_CODE  = os.getenv("ADMIN_REGISTER_CODE", "")
 
+# Client "service role" -> akses penuh ke database (dipakai untuk operasi data)
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-app = FastAPI(title="A Piece of Eden API", version="2.0.0")
+# Client "anon" -> khusus untuk proses autentikasi (register/login/verifikasi token)
+supabase_auth: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+app = FastAPI(title="A Piece of Eden API", version="2.1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://deploy-eden.vercel.app"],
@@ -40,9 +46,97 @@ def upload_to_supabase_storage(file_bytes: bytes, file_name: str, content_type: 
     return f"{SUPABASE_URL}/storage/v1/object/public/{STORAGE_BUCKET}/{file_name}"
 
 
+# ═══════════════════════════════════════════════════════════════
+#  AUTENTIKASI ADMIN
+# ═══════════════════════════════════════════════════════════════
+
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    register_code: str
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
 class ReservationStatus(BaseModel):
     status: str
 
+
+class AdminNotesUpdate(BaseModel):
+    admin_notes: str
+
+
+def get_current_admin(authorization: str = Header(None)):
+    """Dependency untuk memproteksi endpoint admin. Memverifikasi Bearer token
+    dari Supabase Auth yang dikirim lewat header Authorization."""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Token tidak ditemukan. Silakan login kembali.")
+
+    token = authorization.split(" ", 1)[1]
+    try:
+        user_response = supabase_auth.auth.get_user(token)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Sesi tidak valid atau sudah kedaluwarsa. Silakan login kembali.")
+
+    if not user_response or not user_response.user:
+        raise HTTPException(status_code=401, detail="Sesi tidak valid atau sudah kedaluwarsa. Silakan login kembali.")
+
+    return user_response.user
+
+
+@app.post("/api/auth/register")
+async def register_admin(body: RegisterRequest):
+    if not ADMIN_REGISTER_CODE or body.register_code != ADMIN_REGISTER_CODE:
+        raise HTTPException(status_code=403, detail="Kode registrasi admin tidak valid.")
+
+    if len(body.password) < 6:
+        raise HTTPException(status_code=400, detail="Password minimal 6 karakter.")
+
+    try:
+        result = supabase_auth.auth.sign_up({"email": body.email, "password": body.password})
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Registrasi gagal: {str(e)}")
+
+    if not result.user:
+        raise HTTPException(status_code=400, detail="Registrasi gagal. Coba lagi.")
+
+    return {
+        "success": True,
+        "message": "Akun admin berhasil dibuat. Jika verifikasi email aktif di Supabase, cek inbox terlebih dahulu sebelum login.",
+        "email": result.user.email,
+    }
+
+
+@app.post("/api/auth/login")
+async def login_admin(body: LoginRequest):
+    try:
+        result = supabase_auth.auth.sign_in_with_password({"email": body.email, "password": body.password})
+    except Exception:
+        raise HTTPException(status_code=401, detail="Email atau password salah.")
+
+    if not result.session:
+        raise HTTPException(status_code=401, detail="Email atau password salah.")
+
+    return {
+        "success": True,
+        "access_token": result.session.access_token,
+        "refresh_token": result.session.refresh_token,
+        "expires_in": result.session.expires_in,
+        "email": result.user.email,
+    }
+
+
+@app.get("/api/auth/me")
+def get_me(current_admin=Depends(get_current_admin)):
+    return {"success": True, "email": current_admin.email}
+
+
+# ═══════════════════════════════════════════════════════════════
+#  RESERVASI (endpoint publik untuk tamu)
+# ═══════════════════════════════════════════════════════════════
 
 @app.post("/api/reservations")
 async def create_reservation(
@@ -94,14 +188,28 @@ async def create_reservation(
     }
 
 
+@app.get("/api/availability")
+def check_availability(date: str):
+    response = supabase.table("reservations") \
+        .select("id, status") \
+        .eq("event_date", date) \
+        .in_("status", ["pending", "confirmed"]) \
+        .execute()
+    return {"date": date, "available": len(response.data) == 0, "bookings_count": len(response.data)}
+
+
+# ═══════════════════════════════════════════════════════════════
+#  RESERVASI (endpoint khusus admin — wajib login)
+# ═══════════════════════════════════════════════════════════════
+
 @app.get("/api/reservations")
-def list_reservations():
+def list_reservations(current_admin=Depends(get_current_admin)):
     response = supabase.table("reservations").select("*").order("created_at", desc=True).execute()
     return {"success": True, "total": len(response.data), "data": response.data}
 
 
 @app.get("/api/reservations/{reservation_id}")
-def get_reservation(reservation_id: str):
+def get_reservation(reservation_id: str, current_admin=Depends(get_current_admin)):
     response = supabase.table("reservations").select("*").eq("id", reservation_id).execute()
     if not response.data:
         raise HTTPException(status_code=404, detail="Reservasi tidak ditemukan")
@@ -109,7 +217,7 @@ def get_reservation(reservation_id: str):
 
 
 @app.patch("/api/reservations/{reservation_id}/status")
-def update_status(reservation_id: str, body: ReservationStatus):
+def update_status(reservation_id: str, body: ReservationStatus, current_admin=Depends(get_current_admin)):
     valid = ["pending", "confirmed", "cancelled"]
     if body.status not in valid:
         raise HTTPException(status_code=400, detail=f"Status tidak valid. Pilih: {', '.join(valid)}")
@@ -119,11 +227,9 @@ def update_status(reservation_id: str, body: ReservationStatus):
     return {"success": True, "message": f"Status diubah ke '{body.status}'", "data": response.data[0]}
 
 
-@app.get("/api/availability")
-def check_availability(date: str):
-    response = supabase.table("reservations") \
-        .select("id, status") \
-        .eq("event_date", date) \
-        .in_("status", ["pending", "confirmed"]) \
-        .execute()
-    return {"date": date, "available": len(response.data) == 0, "bookings_count": len(response.data)}
+@app.patch("/api/reservations/{reservation_id}/notes")
+def update_notes(reservation_id: str, body: AdminNotesUpdate, current_admin=Depends(get_current_admin)):
+    response = supabase.table("reservations").update({"admin_notes": body.admin_notes}).eq("id", reservation_id).execute()
+    if not response.data:
+        raise HTTPException(status_code=404, detail="Reservasi tidak ditemukan")
+    return {"success": True, "message": "Catatan admin berhasil disimpan", "data": response.data[0]}

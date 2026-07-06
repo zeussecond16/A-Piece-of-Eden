@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="admin.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard — A Piece of Eden</title>
+  <link href="https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@400;700&family=Allura&family=Alegreya:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+
+  <style>
+    .toast {
+      position: fixed;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: #1c8049;
+      color: #fff;
+      padding: 14px 28px;
+      border-radius: 30px;
+      font-family: 'Alegreya', serif;
+      font-size: 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+      opacity: 0;
+      transition: opacity 0.4s, transform 0.4s;
+      z-index: 99999;
+      text-align: center;
+      max-width: 480px;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.error { background: #c0392b; }
+  </style>
+</head>
+
+<body class="admin-body">
+
+<div class="admin-topbar">
+  <div class="logo">A Piece of Eden — Admin</div>
+  <div class="admin-topbar-right">
+    <span class="admin-email" id="admin-email"></span>
+    <button class="admin-logout-btn" id="logout-btn">Logout</button>
+  </div>
+</div>
+
+<main class="admin-main">
+  <h1 class="admin-page-title">Dashboard Reservasi</h1>
+  <p class="admin-page-subtitle">Kelola setiap tamu Eden</p>
+
+  <div class="admin-stats" id="admin-stats"></div>
+
+  <div class="admin-filters" id="admin-filters">
+    <button class="filter-tab active" data-filter="all">Semua</button>
+    <button class="filter-tab" data-filter="pending">Pending</button>
+    <button class="filter-tab" data-filter="confirmed">Confirmed</button>
+    <button class="filter-tab" data-filter="cancelled">Cancelled</button>
+  </div>
+
+  <div id="res-container">
+    <div class="admin-loading">Memuat data reservasi...</div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const API_URL = "https://grand-dedication-production-9d90.up.railway.app";
+  const token   = localStorage.getItem('eden_admin_token');
+  const email   = localStorage.getItem('eden_admin_email');
+
+  if (!token) {
+    window.location.href = 'admin-login.html';
+  }
+
+  document.getElementById('admin-email').textContent = email || '';
+
+  document.getElementById('logout-btn').addEventListener('click', function () {
+    localStorage.removeItem('eden_admin_token');
+    localStorage.removeItem('eden_admin_email');
+    window.location.href = 'admin-login.html';
+  });
+
+  let allReservations = [];
+  let currentFilter = 'all';
+
+  async function loadReservations() {
+    try {
+      const response = await fetch(`${API_URL}/api/reservations`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.status === 401) {
+        localStorage.removeItem('eden_admin_token');
+        localStorage.removeItem('eden_admin_email');
+        window.location.href = 'admin-login.html';
+        return;
+      }
+
+      const result = await response.json();
+      if (response.ok && result.success) {
+        allReservations = result.data;
+        renderStats();
+        renderList();
+      } else {
+        showToast(result.detail || 'Gagal memuat data reservasi.', true);
+      }
+    } catch (err) {
+      console.error(err);
+      document.getElementById('res-container').innerHTML =
+        '<div class="admin-empty">Tidak dapat terhubung ke server.</div>';
+    }
+  }
+
+  function renderStats() {
+    const total     = allReservations.length;
+    const pending   = allReservations.filter(r => r.status === 'pending').length;
+    const confirmed = allReservations.filter(r => r.status === 'confirmed').length;
+    const cancelled = allReservations.filter(r => r.status === 'cancelled').length;
+
+    document.getElementById('admin-stats').innerHTML = `
+      <div class="stat-card"><div class="stat-num">${total}</div><div class="stat-label">Total Reservasi</div></div>
+      <div class="stat-card"><div class="stat-num">${pending}</div><div class="stat-label">Menunggu Konfirmasi</div></div>
+      <div class="stat-card"><div class="stat-num">${confirmed}</div><div class="stat-label">Terkonfirmasi</div></div>
+      <div class="stat-card"><div class="stat-num">${cancelled}</div><div class="stat-label">Dibatalkan</div></div>
+    `;
+  }
+
+  function renderList() {
+    const container = document.getElementById('res-container');
+    const filtered = currentFilter === 'all'
+      ? allReservations
+      : allReservations.filter(r => r.status === currentFilter);
+
+    if (filtered.length === 0) {
+      container.innerHTML = '<div class="admin-empty">Tidak ada reservasi untuk filter ini.</div>';
+      return;
+    }
+
+    container.innerHTML = `<div class="res-list">${filtered.map(cardHtml).join('')}</div>`;
+    attachCardEvents();
+  }
+
+  function formatRupiah(n) {
+    return 'Rp ' + Number(n || 0).toLocaleString('id-ID');
+  }
+
+  function cardHtml(r) {
+    return `
+      <div class="res-card" data-id="${r.id}">
+        <div>
+          <p class="res-name">${escapeHtml(r.name)}</p>
+          <div class="res-meta">
+            <b>Email:</b> ${escapeHtml(r.email)}<br>
+            <b>Telepon:</b> ${escapeHtml(r.phone)}
+          </div>
+        </div>
+
+        <div class="res-meta">
+          <b>Tanggal:</b> ${r.event_date}<br>
+          <b>Waktu:</b> ${r.time_start} — ${r.time_end}<br>
+          <b>Tamu:</b> ${r.guests} orang
+        </div>
+
+        <div class="res-cost">
+          <span class="amount">${formatRupiah(r.total_cost)}</span>
+          DP: ${formatRupiah(r.dp_amount)}<br>
+          <span class="status-badge status-${r.status}">${r.status}</span>
+        </div>
+
+        <div class="res-actions">
+          <select class="status-select">
+            <option value="pending"   ${r.status === 'pending'   ? 'selected' : ''}>Pending</option>
+            <option value="confirmed" ${r.status === 'confirmed' ? 'selected' : ''}>Confirmed</option>
+            <option value="cancelled" ${r.status === 'cancelled' ? 'selected' : ''}>Cancelled</option>
+          </select>
+          ${r.payment_proof_url ? `<a class="res-proof-link" href="${r.payment_proof_url}" target="_blank" rel="noopener">Lihat Bukti Bayar</a>` : ''}
+          <button class="res-notes-toggle">Catatan Admin</button>
+        </div>
+
+        <div class="res-notes-panel">
+          <textarea placeholder="Tulis catatan internal tentang reservasi ini...">${escapeHtml(r.admin_notes || '')}</textarea>
+          <button class="res-notes-save">Simpan Catatan</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str ?? '';
+    return div.innerHTML;
+  }
+
+  function attachCardEvents() {
+    document.querySelectorAll('.res-card').forEach(card => {
+      const id = card.getAttribute('data-id');
+
+      card.querySelector('.status-select').addEventListener('change', async function () {
+        await updateStatus(id, this.value, card);
+      });
+
+      card.querySelector('.res-notes-toggle').addEventListener('click', function () {
+        card.querySelector('.res-notes-panel').classList.toggle('open');
+      });
+
+      card.querySelector('.res-notes-save').addEventListener('click', async function () {
+        const textarea = card.querySelector('.res-notes-panel textarea');
+        await saveNotes(id, textarea.value, this);
+      });
+    });
+  }
+
+  async function updateStatus(id, status, card) {
+    try {
+      const response = await fetch(`${API_URL}/api/reservations/${id}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status })
+      });
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        showToast(`✓ Status diubah ke "${status}"`);
+        const badge = card.querySelector('.status-badge');
+        badge.className = `status-badge status-${status}`;
+        badge.textContent = status;
+        const idx = allReservations.findIndex(r => r.id === id);
+        if (idx !== -1) allReservations[idx].status = status;
+        renderStats();
+      } else {
+        showToast(result.detail || 'Gagal mengubah status.', true);
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Tidak dapat terhubung ke server.', true);
+    }
+  }
+
+  async function saveNotes(id, notes, btn) {
+    const originalText = btn.textContent;
+    btn.textContent = 'Menyimpan...';
+    btn.disabled = true;
+
+    try {
+      const response = await fetch(`${API_URL}/api/reservations/${id}/notes`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ admin_notes: notes })
+      });
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        showToast('✓ Catatan admin berhasil disimpan');
+      } else {
+        showToast(result.detail || 'Gagal menyimpan catatan.', true);
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Tidak dapat terhubung ke server.', true);
+    } finally {
+      btn.textContent = originalText;
+      btn.disabled = false;
+    }
+  }
+
+  document.querySelectorAll('.filter-tab').forEach(tab => {
+    tab.addEventListener('click', function () {
+      document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+      this.classList.add('active');
+      currentFilter = this.getAttribute('data-filter');
+      renderList();
+    });
+  });
+
+  function showToast(msg, isError = false) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast' + (isError ? ' error' : '') + ' show';
+    setTimeout(() => { t.className = 'toast'; }, 4500);
+  }
+
+  loadReservations();
+</script>
+
+</body>
+</html>
